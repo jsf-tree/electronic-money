@@ -3,8 +3,8 @@
 
 <svg
    width="120mm"
-   height="110mm"
-   viewBox="0 0 120 110"
+   height="99mm"
+   viewBox="0 0 120 99"
    version="1.1"
    id="svg5"
    xml:space="preserve"
@@ -25,15 +25,15 @@
      inkscape:deskcolor="#d1d1d1"
      inkscape:document-units="mm"
      showgrid="false"
-     inkscape:zoom="2.8284271"
-     inkscape:cx="291.15122"
-     inkscape:cy="277.53941"
+     inkscape:zoom="1.4142136"
+     inkscape:cx="253.49778"
+     inkscape:cy="199.40411"
      inkscape:window-width="1920"
      inkscape:window-height="1017"
      inkscape:window-x="-8"
      inkscape:window-y="-8"
      inkscape:window-maximized="1"
-     inkscape:current-layer="g31774" /><defs
+     inkscape:current-layer="layer4" /><defs
      id="defs2"><clipPath
        id="clip1"><rect
          x="0"
@@ -2957,12 +2957,12 @@
        style="display:inline;fill:#ffffff;fill-opacity:1;stroke:#000000;stroke-width:0.13;stroke-linecap:round;stroke-linejoin:round"
        id="rect13003"
        width="119.88126"
-       height="109.87238"
-       x="0.065745935"
-       y="0.065259166"
+       height="99.021248"
+       x="0.061611824"
+       y="0.064350985"
        ry="0" /><g
        id="g31992"
-       transform="matrix(2.3125107,0,0,2.3125107,-5.9917399,-167.77888)"
+       transform="matrix(2.3125107,0,0,2.3125107,-5.995874,-178.63094)"
        style="display:inline"><rect
          style="opacity:1;fill:#ff6600;fill-opacity:1;stroke:none;stroke-width:0.0975867;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:0.140015, 0.280031;stroke-dashoffset:0;stroke-opacity:1"
          id="rect31753"
@@ -3001,16 +3001,6 @@
            x="8.9181185"
            y="81.513016"
            id="tspan25070">C</tspan></text><text
-         xml:space="preserve"
-         style="font-size:2.11667px;font-family:ar;-inkscape-font-specification:ar;text-align:start;text-anchor:start;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.23;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:none;stroke-opacity:1"
-         x="6.111989"
-         y="76.488129"
-         id="text25487"><tspan
-           sodipodi:role="line"
-           style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.11667px;font-family:Arial;-inkscape-font-specification:Arial;text-align:start;text-anchor:start;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.23"
-           x="6.111989"
-           y="76.488129"
-           id="tspan25485">Abstração do ArcSDE.Harvester.java</tspan></text><text
          xml:space="preserve"
          style="font-size:1.41111px;font-family:ar;-inkscape-font-specification:ar;text-align:center;text-anchor:middle;fill:#ffc66d;fill-opacity:1;stroke:none;stroke-width:0.23;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:none;stroke-opacity:1"
          x="20.944979"
