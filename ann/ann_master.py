@@ -27,10 +27,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 licença -> GNU, BSD, ou MIT
 """
 import numpy as np
-from typing import List, Callable, Dict
+from typing import List, Callable, Dict, Tuple, Set
 import time
 import inspect
-
 
 
 def create_ann(
@@ -221,8 +220,11 @@ def fntreinaval_jsf3(rn, Pt, Tt, Pl, Tl, ciclos, rep, c) -> Dict:
     spar = rn.output.par                                                  # Parâmetros utilizados para cada nó de saída pela função de escalonamento de saída
 
     # Escalonar os registros de entrada e saída para treinamento (Pt, Tt) e validação-cruzada (Pl, Tl)
-    u = np.ones(Pt.shape[1])                                           # Inicializar um vetor-base para multiplicar os parâmetros de escalonamento, serão usados nas funções de escalonamento
-    p = eesc(Pt, epar, u)                                              # Entradas dos registros de treinamento (Padrões)
+    u = np.ones([1, Pt.shape[1]])                                           # Inicializar um vetor-base para multiplicar os parâmetros de escalonamento, serão usados nas funções de escalonamento
+    print(Pt.shape, epar.shape, u.shape)
+    p = eesc(Pt, epar)                                              # Entradas dos registros de treinamento (Padrões)
+    print(p.shape)
+    #print(Tt.shape, spar.shape, u.shape)
     t = sesc(Tt, spar, u)                                              # Saída dos registros de treinamento (Alvos)
 
     ul = np.ones(Pl.shape[1])                                          # Inicializar um vetor-base para multiplicar os parâmetros de escalonamento, serão usados nas funções de escalonamento
@@ -490,27 +492,76 @@ class MLP:
     def __init__(
             self,
             struct=None,
-            enom=None,
-            epar=None,
-            snom=None,
-            spar=None,
-            eesc=None,
-            ifat=None,
-            ider=None,
-            sfat=None,
-            sder=None,
-            sesc=None,
-            srec=None,
+            enom: List[str]=None,
+            epar: np.ndarray=None,
+            snom: List[str]=None,
+            spar: np.ndarray=None,
+            eesc: Callable=None,
+            ifat: Callable=None,
+            ider: Callable=None,
+            sfat: Callable=None,
+            sder: Callable=None,
+            sesc: Callable=None,
+            srec: Callable=None,
     ):
         struct = struct if struct is not None else [1, 3, 1]
-        # todo self.check_inputs(struct, enom, eesc, epar, ifat, ider, snom, sfat, sder, sesc, srec, spar, )
 
-        self.input = self.InputLayer()
-        if len(struct) == 3:
-            self.hidden = self.HiddenLayer()
-        else:
-            raise ValueError("For now only one hidden layer is accepted.")
-        self.output = self.OutputLayer()
+        self.input = self.InputLayer(num=struct[0], par=epar, esc=eesc)
+        self.hidden = self.HiddenLayer()
+        self.output = self.OutputLayer(num=struct[2], par=spar, esc=sesc)
+
+    class InputLayer:
+        def __init__(self, num, par, nom=None, esc=None):
+            self.num: int = num
+            if nom is None:
+                self.nom = {f'X{_}' for _ in range(num)}
+            else:
+                self.nom = set(nom)
+            if esc is None:
+                self.esc = MLP.minmax_scale()
+            else:
+                self.esc = esc
+            self.par = par
+
+    class HiddenLayer:
+        def __init__(self):
+            self.num: int = 0
+            self.sin: np.ndarray = np.array([None])
+            self.fat: Callable = MLP.sigmoid()
+            self.der: Callable = MLP.sigmoid_der()
+
+    class OutputLayer:
+        def __init__(self, num, par, nom=None, esc=None,):
+            self.num: int = 0
+            if nom is None:
+                self.nom = {f'Y{_}' for _ in range(num)}
+            else:
+                self.nom = set(nom)
+            self.sin: np.ndarray = np.array([None])
+            self.fat: Callable = MLP.sigmoid()
+            self.der: Callable = MLP.sigmoid_der()
+            if esc is None:
+                self.esc = MLP.minmax_scale()
+            else:
+                self.esc = esc
+            self.rec: Callable = lambda x: None
+            self.par = par
+
+    @staticmethod
+    def sigmoid() -> Callable:
+        return lambda n: 1. / (1 + np.exp(-n)).T
+
+    @staticmethod
+    def sigmoid_der() -> Callable:
+        return lambda a: np.maximum(a * (1 - a), 0.01).T
+
+    @staticmethod
+    def minmax_scale():
+        return lambda v, par: (v - par[:, 0])/(par[:, 1, np.newaxis] - par[:, 0, np.newaxis])
+
+    @staticmethod
+    def minmax_descale():
+        return lambda v, par, u: (v - par[:, 0] * u) / ((par[:, 1] - par[:, 0]) * u).T
 
     @staticmethod
     def check_nodes_per_layer(nodes_per_layer):
@@ -521,31 +572,6 @@ class MLP:
         else:
             print(f'Creating ANN with following architecture: {nodes_per_layer!s}')
 
-    class InputLayer:
-        def __init__(self):
-            self.num: int = 0
-            self.nom: List = []
-            self.esc: Callable = lambda x: None
-            self.par: List = []
-
-    class HiddenLayer:
-        def __init__(self):
-            self.num: int = 0
-            self.sin: np.ndarray = np.array([None])
-            self.fat: Callable = lambda x: None
-            self.der: Callable = lambda x: None
-
-    class OutputLayer:
-        def __init__(self):
-            self.num: int = 0
-            self.nom: List = []
-            self.sin: np.ndarray = np.array([None])
-            self.fat: Callable = lambda x: None
-            self.der: Callable = lambda x: None
-            self.esc: Callable = lambda x: None
-            self.rec: Callable = lambda x: None
-            self.par: List = []
-
     @staticmethod
     def SIN(n_layer, n_previous_layer):
         """Randomize weights of node"""
@@ -554,17 +580,46 @@ class MLP:
 
 
 if __name__ == '__main__':
-    # Pattern and Target
+    """# Pattern and Target
     conc = [np.array([[float(0)], [float(0)]]), np.array([np.linspace(0, 10, 111), np.linspace(0, 10, 111)])]
     P = np.concatenate(conc, axis=1)
     T = np.array(list(map(lambda x: x * 2, P[0])))
 
-    # Systematic sampling
-    ja, jr = systematicsampling(registros=np.concatenate([P, [T]], axis=0), num_registros=20, m=0, extremes=1, output_i=-1, )
-    # print(f'{ja} len:{len(ja)}')
-    # print(f'{jr} len:{len(jr)}')
+    M = np.concatenate([P, [T]], axis=0)
 
-    ann = MLP(struct=[1, 5, 1], enom=['x'], snom=['y'], )
-    print(inspect.getsource(ann.input.esc))
-    [rn, _, J, dtrep] = fntreinaval_jsf3(ann, Pt=P[:, jr], Tt=T[jr], Pl=P[:, ja], Tl=T[ja], ciclos=1_000, rep=1, c=0)
-    # [NS, Mea, Mpea, Pbias, Me, E10, E25, E50, E75, E90, n]=fmudesempenho_jsf(Tl, Sl, 0, 1, snom)
+    # Systematic sampling
+    ja, jr = systematicsampling(registros=M, num_registros=20, m=0, extremes=1, output_i=-1, )
+
+    min_values = np.amin(M, axis=1)
+    max_values = np.amax(M, axis=1)
+    esc_par = np.array([min_values, max_values-min_values]).T
+
+    rn = MLP(
+        struct=[1, 5, 1],
+        enom=['x'],
+        snom=['y'],
+        epar=esc_par[:-1],
+        spar=esc_par[-1],
+        )
+
+    result = P[:, jr] - rn.input.par[:, 0, np.newaxis]
+    a = np.ones(P[:, jr].shape).T
+    b = rn.input.par[:, 0]
+    #print(a.shape, b.shape)
+    result = a * b
+    #print(result.T)
+    [rn, _, J, dtrep] = fntreinaval_jsf3(rn, Pt=P[:, jr], Tt=T[jr].reshape(-1, 1), Pl=P[:, ja], Tl=T[ja].reshape(-1, 1), ciclos=1_000, rep=1, c=0, )
+    # [NS, Mea, Mpea, Pbias, Me, E10, E25, E50, E75, E90, n]=fmudesempenho_jsf(Tl, Sl, 0, 1, snom)"""
+
+    a = np.array([[ 1,  2,  3],
+                   [ 4,  5,  6],
+                   [ 7,  8,  9],
+                   [10, 11, 12]])
+
+    b = np.array([[ 1,  3],
+                   [ 4,  6],
+                   [ 7,  9],
+                   [10, 12]])
+
+    print(a[:-1] - b[:-1, 0])
+    print(a[-1, :] - b[-1, 0])
