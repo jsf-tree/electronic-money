@@ -41,10 +41,10 @@ def create_ann(
         ider: Callable = None,
         snom: List[str] = None,
         sfat: Callable = None,
-        sder: Callable = None,
-        sesc: Callable = None,
         srec: Callable = None,
         spar: List[float] = None,
+        sder: Callable = None,
+        sesc: Callable = None,
 ):
     """
      Create 1-hidden layer ANN structure. Default scaling functions are
@@ -109,18 +109,7 @@ def create_ann(
 
     rn = {}
 
-    ## (1) ANN STRUCTURE
-    rn['ent'] = {'num': struct[0], 'nom': enom, 'esc': eesc, 'par': epar}
-    rn['int'] = {'num': struct[1], 'sin': SIN(struct[1], struct[0]), 'fat': ifat, 'der': ider}
-    rn['sai'] = {'num': struct[2], 'nom': snom, 'sin': SIN(struct[2], struct[1]), 'fat': sfat, 'der': sder, 'esc': sesc, 'rec': srec, 'par': spar}
-
     return rn
-
-
-## (2) AUXILIARY FUNCTIONS
-def SIN(n_layer, n_previous_layer):
-    np.random.seed()
-    return np.random.randn(n_layer, n_previous_layer + 1)
 
 
 def fntreinaval_jsf3(rn, Pt, Tt, Pl, Tl, ciclos, rep, c) -> Dict:
@@ -164,6 +153,7 @@ def fntreinaval_jsf3(rn, Pt, Tt, Pl, Tl, ciclos, rep, c) -> Dict:
 
      Juliano Finck Ultima atualização: 28/04/2020
      """
+
     def fniniciais(nh, p, t) -> List[np.ndarray]:
         """
         Inicialização dos pesos sinápticos aleatoriamente
@@ -180,11 +170,11 @@ def fntreinaval_jsf3(rn, Pt, Tt, Pl, Tl, ciclos, rep, c) -> Dict:
         bs (numpy.ndarray): vetor de bias da camada de saída
         """
         # Inicializar pesos sinápticos
-        np.random.seed(0)
+        np.random.seed()
         pmed = np.mean(np.abs(p))
         natr, nvar = p.shape
         nsai, _ = t.shape
-        wh = (np.random.rand(nh, nvar) * 2 - 1) / (nvar * pmed)
+        wh = (np.random.rand(nh, natr) * 2 - 1) / (nvar * pmed)
         bh = (np.random.rand(nh, 1) * 2 - 1) / (nvar * pmed)
         ws = (np.random.rand(nsai, nh) * 2 - 1) / nh
         bs = (np.random.rand(nsai, 1) * 2 - 1) / nh
@@ -195,70 +185,78 @@ def fntreinaval_jsf3(rn, Pt, Tt, Pl, Tl, ciclos, rep, c) -> Dict:
         A Rotina de Atualização dos Pesos segundo o erro (é feita uma interação)
         [Wh, Bh, Ws, Bs]=fnatualiza(wh, bh, ws, bs, p, h, s, es, Dh, Ds, taxa, u)
         """
-        eh = np.matmul(ws.T * np.multiply(es, Ds(s)))                                    # Rumelhardt (1986) - Erro interno = erro saida * Ds(s) * Pesos de saida
-        Ws = ws + taxa * np.matmul(np.multiply(es, Ds(s)) * h.T)
-        Bs = bs + taxa * np.matmul(np.multiply(es, Ds(s)) * u.T)
-        Wh = wh + taxa * np.matmul(np.multiply(eh, Dh(h)) * p.T)
-        Bh = bh + taxa * np.matmul(np.multiply(eh, Dh(h)) * u.T)
+        eh = ws.T @ (es * Ds(s))  # Rumelhardt (1986) - Erro interno = erro saida * Ds(s) * Pesos de saida
+        Ws = ws + taxa * ((es * Ds(s)) @ h.T)
+        Bs = bs + taxa * ((es * Ds(s)) @ u.T)
+        Wh = wh + taxa * ((eh * Dh(h)) @ p.T)
+        Bh = bh + taxa * ((eh * Dh(h)) @ u.T)
         return Wh, Bh, Ws, Bs
 
     # Extração de informações da estrutura da RNA (rn):
     # Funções de Ativação e suas Derivadas
-    Ah = rn.hidden.fat                                                    # Leitura da função de ativação da camada interna (armazenada em string em forma de ponteiro) "@(n)1./(1+exp(-n))"
-    Dh = rn.hidden.der                                                    # Leitura da derivada da função de ativação da camada interna (armazenada em string em forma de ponteiro) "@(a) max(a.*(1-a), 0.01)"¹
-    As = rn.output.fat                                                    # Leitura da função de ativação da camada de saida (armazenada em string em forma de ponteiro) "@(n)1./(1+exp(-n))"
-    Ds = rn.output.der                                                    # Leitura da derivada da função de ativação da camada de saida (armazenada em string em forma de ponteiro) "@(a) max(a.*(1-a), 0.01)"¹
+    Ah = rn.hidden.fat  # Leitura da função de ativação da camada interna (armazenada em string em forma de ponteiro) "@(n)1./(1+exp(-n))"
+    Dh = rn.hidden.der  # Leitura da derivada da função de ativação da camada interna (armazenada em string em forma de ponteiro) "@(a) max(a.*(1-a), 0.01)"¹
+    As = rn.output.fat  # Leitura da função de ativação da camada de saida (armazenada em string em forma de ponteiro) "@(n)1./(1+exp(-n))"
+    Ds = rn.output.der  # Leitura da derivada da função de ativação da camada de saida (armazenada em string em forma de ponteiro) "@(a) max(a.*(1-a), 0.01)"¹
     # A é Ativação; D é Derivada; h é hidden layer (camada interna); s é cama de saída)
     # ¹Nota: às vezes a derivada retorna muito muito baixa, por isso é adicionado o minimo de 0.01
 
-    nh = rn.hidden.num                                                    # Número de neurônios internos
+    nh = rn.hidden.num  # Número de neurônios internos
 
     # Funções de Escalonamento e Parâmetros de Escalonamento
-    eesc = rn.input.esc                                                  # Função de escalonamento para entrada (armazenada em string em forma de ponteiro) "@(v, par, u) (v-par(:, 1)*u)./(par(:, 2)*u)"
-    epar = rn.input.par                                                  # Parâmetros utilizados para cada nó de entrada pela função de escalonamento de entrada
-    sesc = rn.output.esc                                                  # Função de escalonamento para saída (armazenada em string em forma de ponteiro) "@(v, par, u) (v-par(:, 1)*u)./(par(:, 2)*u)"
-    spar = rn.output.par                                                  # Parâmetros utilizados para cada nó de saída pela função de escalonamento de saída
+    eesc = rn.input.esc  # Função de escalonamento para entrada (armazenada em string em forma de ponteiro) "@(v, par, u) (v-par(:, 1)*u)./(par(:, 2)*u)"
+    epar = rn.input.par  # Parâmetros utilizados para cada nó de entrada pela função de escalonamento de entrada
+    sesc = rn.output.esc  # Função de escalonamento para saída (armazenada em string em forma de ponteiro) "@(v, par, u) (v-par(:, 1)*u)./(par(:, 2)*u)"
+    spar = rn.output.par  # Parâmetros utilizados para cada nó de saída pela função de escalonamento de saída
 
     # Escalonar os registros de entrada e saída para treinamento (Pt, Tt) e validação-cruzada (Pl, Tl)
-    u = np.ones([1, Pt.shape[1]])                                           # Inicializar um vetor-base para multiplicar os parâmetros de escalonamento, serão usados nas funções de escalonamento
-    print(Pt.shape, epar.shape, u.shape)
-    p = eesc(Pt, epar)                                              # Entradas dos registros de treinamento (Padrões)
-    print(p.shape)
-    #print(Tt.shape, spar.shape, u.shape)
-    t = sesc(Tt, spar, u)                                              # Saída dos registros de treinamento (Alvos)
 
-    ul = np.ones(Pl.shape[1])                                          # Inicializar um vetor-base para multiplicar os parâmetros de escalonamento, serão usados nas funções de escalonamento
-    pl = eesc(Pl, epar, ul)                                            # Entradas dos registros de validação (Padrões)
-    tl = sesc(Tl, spar, ul)                                            # Saída dos registros de validação (Alvos)
+    u = np.ones([1, Pt.shape[
+        1]])  # Inicializar um vetor-base para multiplicar os parâmetros de escalonamento, serão usados nas funções de escalonamento
+    ul = np.ones([1, Pl.shape[
+        1]])  # Inicializar um vetor-base para multiplicar os parâmetros de escalonamento, serão usados nas funções de escalonamento
+    # todo se for unidimensional, adicionar dimensão para operações
+    if len(Tt.shape) == 1:
+        Tt = Tt.reshape(-1, 1).T
+    if len(epar.shape) == 1:
+        epar = epar.reshape(-1, 1).T
+    if len(Tl.shape) == 1:
+        Tl = Tl.reshape(-1, 1).T
+    if len(spar.shape) == 1:
+        spar = spar.reshape(-1, 1).T
+
+    p = eesc(Pt, epar)  # Entradas dos registros de treinamento (Padrões)
+    t = sesc(Tt, spar)  # Saída dos registros de treinamento (Alvos)
+
+    pl = eesc(Pl, epar)  # Entradas dos registros de validação (Padrões)
+    tl = sesc(Tl, spar)  # Saída dos registros de validação (Alvos)
     # (P é o padrão de entrada; T é o alvo de saída da rede; t é treinamento; l é validação cruzada)
 
     # Pronto para inicializar o treinamento
     print('\n% Em treinamento\n')
-    tempo = time.perf_counter()                                        # Declara início do treinamento no console e armazena tinicial
-    c = 0 if c is None else c                                          # Critério clássico do grupo se C é empty
+    tempo = time.perf_counter()  # Declara início do treinamento no console e armazena tinicial
+    c = 0 if c is None else c  # Critério clássico do grupo se C é empty
 
-    pr = {'rep': [], 'Jx': [], 'RMSE_t (ciclo)': [], 'RMSE_l (ciclo)': [], 'Tx_t (ciclo)': [], 'NS_l (Jx)': [], 'E10 E25 E50 E75 E90 MEA': [], 'RMSE_l_>atencao': [], 'Quantil_l_>atencao': [], 'rn': [], }
+    pr = {'rep': [], 'Jx': [], 'RMSE_t (ciclo)': [], 'RMSE_l (ciclo)': [], 'Tx_t (ciclo)': [], 'NS_l (Jx)': [],
+          'E10 E25 E50 E75 E90 MEA': [], 'RMSE_l_>atencao': [], 'Quantil_l_>atencao': [], 'rn': [], }
 
     for r in range(rep):
-        print(f'% rep = {r}')  # Declara início do treinamento da respectiva repetição
+        print(f'Repetition:{r + 1:>3} | ', end='')  # Declara início do treinamento da respectiva repetição
         # Pré-Treinamento:
         # Iniciar pesos sinápticos aleatórios
-        wh, bh, ws, bs = fniniciais(nh, p, t)  # (Neurônios Internos X Tamanho da Entrada X Tamanho da Saída -> pesos sinápticos aleatórios)
+        wh, bh, ws, bs = fniniciais(nh, p,
+                                    t)  # (Neurônios Internos X Tamanho da Entrada X Tamanho da Saída -> pesos sinápticos aleatórios)
 
         # Propagar o sinal de entrada (p - padrão) até a saída (s), passando pela camada interna (h)
-        h = Ah(wh @ p + bh @ u)  # h=1./(1+exp(-(wh*p+bh*u)));        % Sinal para camada interna
-        s = As(ws @ h + bs @ u)  # s=1./(1+exp(-(ws*h+bs*u)));        % Sinal para camada de saida
+        h = Ah(wh @ p + bh @ u).T  # h=1./(1+exp(-(wh*p+bh*u)));        % Sinal para camada interna
+        s = As(ws @ h + bs @ u).T  # s=1./(1+exp(-(ws*h+bs*u)));        % Sinal para camada de saida
 
         # Erro calculado para primeira iteração
         es = t - s
-        RMSE_t = np.zeros(ciclos)
-        Tx = np.zeros(ciclos)
+        RMSE_t, Tx = (np.zeros(ciclos), np.zeros(ciclos))
         RMSE_t[0] = np.sqrt(np.sum(np.square(es)))  # Guarda o erro quadrático para o primeiro ciclo
-        taxa = 0.05
-        Tx[0] = taxa
-        mom = 0.96
-        mo = mom
-        ciclo = 1  # Define taxa de treinamento e o momento inicial
+        taxa, mom, ciclo = (0.05, 0.96, 0)  # Define taxa de treinamento e o momento inicial
+        Tx[0], mo = (taxa, mom)
         dwh = np.zeros_like(wh)
         dbh = np.zeros_like(bh)
         dws = np.zeros_like(ws)
@@ -266,18 +264,22 @@ def fntreinaval_jsf3(rn, Pt, Tt, Pl, Tl, ciclos, rep, c) -> Dict:
 
         RMSE_l = np.zeros(ciclos)
         RMSE_l[0] = RMSE_t[0]
-        RMSE_lx = RMSE_t[0] * 10  # Incializar parâmetros de ótimo para caso o treinamento estagne logo no início (caso raro)
+        RMSE_lx = RMSE_t[
+                      0] * 10  # Incializar parâmetros de ótimo para caso o treinamento estagne logo no início (caso raro)
         Jx = 1
         whx = wh
         bhx = bh
         wsx = ws
         bsx = bs
+        ciclo += 1
 
         # Iniciar os ciclos de treinamento
         while ciclo < ciclos and ciclo <= Jx + 1000:
-            ciclo += 1  # Parar se Nº max ciclos ou tolerância de ciclos piores atingido.
+            # Parar se Nº max ciclos ou tolerância de ciclos piores atingido.
             # RETROPROPAGAÇÃO PURA
-            Wh, Bh, Ws, Bs = fnatualiza(wh, bh, ws, bs, p, h, s, es, Dh, Ds, taxa, u)  # Retropropaga o erro, atualizando os novos pesos sinápticos
+            Wh, Bh, Ws, Bs = fnatualiza(wh, bh, ws, bs, p, h, s, es, Dh, Ds, taxa,
+                                        u)  # Retropropaga o erro, atualizando os novos pesos sinápticos
+
             # TAXA CONJUGADA (MOMENTO+HEURISTICA)
             # Adiciona o momento de inércia aos pesos
             Wh += mo * dwh
@@ -286,8 +288,8 @@ def fntreinaval_jsf3(rn, Pt, Tt, Pl, Tl, ciclos, rep, c) -> Dict:
             Bs += mo * dbs
 
             # Feedforward com novos pesos
-            H = Ah(Wh @ p + Bh @ u)
-            S = As(Ws @ H + Bs @ u)
+            H = Ah(Wh @ p + Bh @ u).T
+            S = As(Ws @ H + Bs @ u).T
 
             # Calcula o erro de saída
             Es = t - S
@@ -320,8 +322,8 @@ def fntreinaval_jsf3(rn, Pt, Tt, Pl, Tl, ciclos, rep, c) -> Dict:
                 taxa *= 1.1
 
             # VALIDAÇÃO CRUZADA - Será que a capacidade de generalização está sendo comprometida?
-            hl = Ah(wh @ pl + bh @ ul)
-            sl = As(ws @ hl + bs @ ul)
+            hl = Ah(wh @ pl + bh @ ul).T
+            sl = As(ws @ hl + bs @ ul).T
             el = tl - sl
             RMSE_l[ciclo] = np.sqrt(np.sum(np.square(el)))
 
@@ -334,23 +336,23 @@ def fntreinaval_jsf3(rn, Pt, Tt, Pl, Tl, ciclos, rep, c) -> Dict:
                 bhx = bh
                 wsx = ws
                 bsx = bs
+            ciclo += 1
 
         # Alocar os pesos encontrados na rede e limpar excesso de variáveis pré-alocadas
         rn.hidden.sin = [whx, bhx]
         rn.output.sin = [wsx, bsx]
-        RMSE_t[:, ciclo + 1:] = []
-        Tx[:, ciclo + 1:] = []
-        RMSE_l[:, ciclo + 1:] = []
+        RMSE_t = RMSE_t[:ciclo]
+        Tx = Tx[:ciclo]
+        RMSE_l = RMSE_l[:ciclo]
         # Declaração do Ciclo de Parada pela Validação Cruzada
         # Feedforward com wx da validacão cruzada
-        hl = Ah(whx @ pl + bhx @ ul)
-        sl = As(wsx @ hl + bsx @ ul)  # Não usar fnexecutar porque sl ficará escalonado
+        hl = Ah(whx @ pl + bhx @ ul).T
+        sl = As(wsx @ hl + bsx @ ul).T  # Não usar fnexecutar porque sl ficará escalonado
         tl_mean = np.mean(tl)
         el = tl - sl
         NS_val = 1 - np.sum(el ** 2) / ((tl - tl_mean) @ (tl - tl_mean).T)  # Calcular NS_val
         # Faltaram ciclos? Performance de validação no console.
-        forma = "%s%08i\t\t%s%01.6f   \t\t%s%01.6f"
-        print(forma % ('J = ', Jx, 'NS_val = ', NS_val, 'RMSE_l = ', RMSE_lx))
+        print(f'J={Jx:>8} | NS_val={float(NS_val):.6f} | RMSE_val={RMSE_lx:>.6f} ', end='\t')
         if Jx > ciclos - 1000:
             print('(Inseguro!)')
         else:
@@ -365,7 +367,8 @@ def fntreinaval_jsf3(rn, Pt, Tt, Pl, Tl, ciclos, rep, c) -> Dict:
         pr['Tx_t (ciclo)'].append(Tx)
         pr['NS_l (Jx)'].append(NS_val)
         el = tl - sl
-        pr['E10 E25 E50 E75 E90 MEA'] = np.concatenate((np.quantile(el, [0.10, 0.25, 0.50, 0.75, 0.90]), [np.mean(np.abs(el))]))
+        pr['E10 E25 E50 E75 E90 MEA'] = np.concatenate(
+            (np.quantile(el, [0.10, 0.25, 0.50, 0.75, 0.90]), [np.mean(np.abs(el))]))
         I_500 = np.where(Tl >= 500)[0]
         tl_atencao = np.quantile(tl, 1 - I_500.size / Tl.size)
         RMSE_l_atencao = np.sqrt(np.sum(np.sum((tl[I_500] - sl[I_500]) ** 2)))
@@ -373,60 +376,55 @@ def fntreinaval_jsf3(rn, Pt, Tt, Pl, Tl, ciclos, rep, c) -> Dict:
         pr['Quantil_l_>atencao'].append(1 - I_500.size / Tl.size)
         pr['rn'].append(rn)
 
-
     # SELECIONAR A MELHOR REPETIÇÃO
     RMSE_l_x = np.zeros((rep, 1))
     NS_l_rep = np.zeros((rep, 1))
     NS_l_x = np.zeros((rep, 1))
     RMSE_l_atencaox = np.zeros((rep, 1))
 
-
-    for i2 in range(1, rep):
+    for i2 in range(rep):
         RMSE_l_x[i2] = pr['RMSE_l (ciclo)'][i2][pr['Jx'][i2]]  # 'RMSE_l (Jx)'
-        NS_l_x[i2] = np.mean(pr['NS_l (Jx)'][i2])              # todo Pq a média? isso é para ser um valor único (PORQUE É UM VETOR)
+        NS_l_x[i2] = np.mean(pr['NS_l (Jx)'][i2])  # todo Pq a média? isso é para ser um valor único (PORQUE É UM VETOR)
         RMSE_l_atencaox[i2] = pr['RMSE_l_>atencao'][i2]
 
     # Print da repetição escolhida (ind) e o critério
     if c == 0:  # RMSE_l mínimo
-        ind = np.where(RMSE_l_x == np.min(RMSE_l_x))[0][0]
-        print('\n%s%i%s' % ('% Escolhida a repetição ', ind, ' (RMSE_l mínimo)'))
+        ind = np.argmin(RMSE_l_x)
+        print(f'# Chosen repetition: {ind} (RMSE_l mínimo)')
     elif c == 1:  # RMSE_l mediano
-        ind = np.where(RMSE_l_x == np.median(np.sort(RMSE_l_x))[0][0])
-        print('\n%s%i%s' % ('% Escolhida a repetição ', ind, ' (RMSE_l mediano)'))
+        ind = np.where(RMSE_l_x == np.median(np.sort(RMSE_l_x)))[0]
+        print(f'# Chosen repetition: {ind} (RMSE_l mediano)')
     elif c == 2:  # NS_l max
         ind = np.where(NS_l_x == np.max(NS_l_x))[0][0]
-        print('\n%s%i%s' % ('% Escolhida a repetição ', ind, ' (NS_l max)'))
+        print(f'# Chosen repetition: {ind} (NS_l max)')
     elif c == 3:  # NS_l mediano
-        ind = np.where(NS_l_x == np.median(np.sort(NS_l_x))[0][0])
-        print('\n%s%i%s' % ('% Escolhida a repetição ', ind, ' (NS_l mediano)'))
+        ind = np.where(NS_l_x == np.median(np.sort(NS_l_x)))[0][0]
+        print(f'# Chosen repetition: {ind} (NS_l mediano)')
     elif c == 4:  # RMSE_l mínimo das saidas extremas: 90%-100%
         ind = np.where(RMSE_l_atencaox == np.min(RMSE_l_atencaox))[0][0]
-        print('\n%s%i%s' % ('% Escolhida a repetição ', ind, ' (RMSE_l mínimo das saidas extremas: 90%-100%)'))
+        print(f'# Chosen repetition: {ind} (RMSE_l mínimo das saidas extremas: 90%-100%)')
 
     # Preparar a rede de saida - [rn_S,V_s,J_s,pr]=fntreinaval_jsf3(...)
-    if ind:
-        rn_S = pr[ind + 1][-1]  # Rede escolhida
-        V_s = [pr[ind + 1][3], pr[ind + 1][4], pr[ind + 1][5]]  # [RMSE_t (ciclo);RMSE_l (ciclo);Tx_t (ciclo)] da Rede escolhida
-        J_s = pr[ind + 1][2]  # Jx da rede escolhida
-        dt = time() - tempo
-        print('\n%s\n%s\t%s\t%4.4f\n%s\t%s\t%4.4f\n\n' % ('% Desvio Padrão (Rep Escolhida vs Reps)', '% ', 'RMSE_l = ', (RMSE_l_x[ind, 1] - np.mean(RMSE_l_x)) / np.std(RMSE_l_x, ddof=0), '% ', 'NS_l   = ', (NS_l_x[ind, 1] - np.mean(NS_l_x)) / np.std(NS_l_x, ddof=0)))  # Desvio do RMSE_l_x da rep escolhida
-    else:
-        rn_S = pr[2][-1]
-        V_s = [pr[2][3], pr[2][4], pr[2][5]]
-        J_s = pr[2][2]
-        dt = time() - tempo
+    rn_S = pr['rn'][ind]  # Rede escolhida
+    V_s = [pr['RMSE_t (ciclo)'][ind], pr['Tx_t (ciclo)'][ind], pr['NS_l (Jx)'][ind]]
+    J_s = pr['Jx'][ind]
+
+    print(f'\n# Desvio Padrão (Rep Escolhida vs Reps)'
+          f'\n#\tRMSE_l\t{float((RMSE_l_x[ind] - np.mean(RMSE_l_x)) / np.std(RMSE_l_x, ddof=0)):.4f}'
+          f'\n#\tNS_l  \t{float((NS_l_x[ind] - np.mean(NS_l_x)) / np.std(NS_l_x, ddof=0)):.4f}', end='\n\n')
+    dt = time.perf_counter() - tempo
 
     # Print time elapsed for training repetitions
     if dt > 60 and dt <= 3600:
-        print('\n%s\t%4.1f%s\n' % ('% Tempo total dispendido:', dt/60, ' minutos'))
+        print('\n%s\t%4.1f%s\n' % ('% Tempo total dispendido:', dt / 60, ' minutos'))
     elif dt > 3600 and dt <= 86400:
-        print('\n%s\t%4.1f%s\n' % ('% Tempo total dispendido:', dt/3600, ' horas'))
+        print('\n%s\t%4.1f%s\n' % ('% Tempo total dispendido:', dt / 3600, ' horas'))
     elif dt <= 60:
         print('\n%s\t%4.1f%s\n' % ('% Tempo total dispendido:', dt, ' segundos'))
     else:
-        print('\n%s\t%4.3f%s\n' % ('% Tempo total dispendido:', dt/86400, ' dias'))
+        print('\n%s\t%4.3f%s\n' % ('% Tempo total dispendido:', dt / 86400, ' dias'))
 
-    return rn_S , V_s , J_s , pr
+    return rn_S, V_s, J_s, pr
 
 
 def fnuexecutar(rn, Pt: np.ndarray) -> np.ndarray:
@@ -443,12 +441,15 @@ def fnuexecutar(rn, Pt: np.ndarray) -> np.ndarray:
     spar = rn.output.par  # Parâmetros utilizados para cada nó de saída pela função de escalonamento de saída
 
     # Escalonar os registros de entrada e saída para treinamento (Pt, Tt) e validação-cruzada (Pl, Tl)
-    u = np.ones(Pt.shape[1])  # Inicializar um vetor-base para multiplicar os parâmetros de escalonamento, serão usados nas funções de escalonamento
+    u = np.ones(Pt.shape[
+                    1])  # Inicializar um vetor-base para multiplicar os parâmetros de escalonamento, serão usados nas funções de escalonamento
     p = eesc(Pt, epar, u)  # Entradas dos registros de treinamento (Padrões)
 
     # Propagar o sinal de entrada (p - padrão) até a saída (s), passando pela camada interna (h)
-    h = Ah(rn.hidden.sin[0] @ p + rn.hidden.sin[1] @ u)  # h=1./(1+exp(-(wh*p+bh*u)));        % Sinal para camada interna
-    s = As(rn.output.sin[0] @ h + rn.output.sin[1] @ u)  # s=1./(1+exp(-(ws*h+bs*u)));        % Sinal para camada de saida
+    h = Ah(
+        rn.hidden.sin[0] @ p + rn.hidden.sin[1] @ u)  # h=1./(1+exp(-(wh*p+bh*u)));        % Sinal para camada interna
+    s = As(
+        rn.output.sin[0] @ h + rn.output.sin[1] @ u)  # s=1./(1+exp(-(ws*h+bs*u)));        % Sinal para camada de saida
     return s
 
 
@@ -475,7 +476,7 @@ def systematicsampling(registros, num_registros, m=0, extremes=0, output_i=None)
     for _ in cols_with_minmax[::-1]:
         j.pop(_)
 
-    step = len(j)/(num_registros + 1 - len(cols_with_minmax))
+    step = len(j) / (num_registros + 1 - len(cols_with_minmax))
 
     js = []
     i = round(step)
@@ -492,23 +493,39 @@ class MLP:
     def __init__(
             self,
             struct=None,
-            enom: List[str]=None,
-            epar: np.ndarray=None,
-            snom: List[str]=None,
-            spar: np.ndarray=None,
-            eesc: Callable=None,
-            ifat: Callable=None,
-            ider: Callable=None,
-            sfat: Callable=None,
-            sder: Callable=None,
-            sesc: Callable=None,
-            srec: Callable=None,
+            enom: List[str] = None,
+            epar: np.ndarray = None,
+            snom: List[str] = None,
+            spar: np.ndarray = None,
+            eesc: Callable = None,
+            ifat: Callable = None,
+            ider: Callable = None,
+            sfat: Callable = None,
+            sder: Callable = None,
+            sesc: Callable = None,
+            srec: Callable = None,
     ):
         struct = struct if struct is not None else [1, 3, 1]
 
+        # check inputs
+        self.check_inputs(struct=struct, enom=enom, epar=epar, snom=
+        snom, spar=spar, eesc=eesc, ifat=ifat, ider=ider, sfat=sfat, sder=sder, sesc=sesc,
+                          srec=srec)
+
         self.input = self.InputLayer(num=struct[0], par=epar, esc=eesc)
-        self.hidden = self.HiddenLayer()
+        self.hidden = self.HiddenLayer(num=struct[1], sin=MLP.randomize_sinaptic_weights(struct[0], struct[1]))
         self.output = self.OutputLayer(num=struct[2], par=spar, esc=sesc)
+
+    @staticmethod
+    def check_inputs(struct=None, enom=None, epar=None, snom=None, spar=None, eesc=None, ifat=None, ider=None,
+                     sfat=None, sder=None, sesc=None, srec=None, ):
+        if enom is None:
+            enom = {f'X{_}' for _ in range(struct[0])}
+        if snom is None:
+            snom = {f'Y{_}' for _ in range(struct[0])}
+        if struct[0] != len(enom):
+            raise ValueError('The number of input nodes and that of input nodes name must match')
+        return struct, enom, epar, snom, spar, eesc, ifat, ider, sfat, sder, sesc, srec
 
     class InputLayer:
         def __init__(self, num, par, nom=None, esc=None):
@@ -524,22 +541,34 @@ class MLP:
             self.par = par
 
     class HiddenLayer:
-        def __init__(self):
-            self.num: int = 0
-            self.sin: np.ndarray = np.array([None])
-            self.fat: Callable = MLP.sigmoid()
-            self.der: Callable = MLP.sigmoid_der()
+        def __init__(self, num, sin, fat=None, der=None):
+            self.num: int = num
+            self.sin: np.ndarray = sin
+            if fat is None:
+                self.fat: Callable = MLP.sigmoid()
+            else:
+                self.fat: Callable = fat
+            if fat is None:
+                self.der: Callable = MLP.sigmoid_der()
+            else:
+                self.der: Callable = der
 
     class OutputLayer:
-        def __init__(self, num, par, nom=None, esc=None,):
+        def __init__(self, num, par, nom=None, esc=None, fat=None, der=None):
             self.num: int = 0
             if nom is None:
                 self.nom = {f'Y{_}' for _ in range(num)}
             else:
                 self.nom = set(nom)
             self.sin: np.ndarray = np.array([None])
-            self.fat: Callable = MLP.sigmoid()
-            self.der: Callable = MLP.sigmoid_der()
+            if fat is None:
+                self.fat: Callable = MLP.sigmoid()
+            else:
+                self.fat: Callable = fat
+            if fat is None:
+                self.der: Callable = MLP.sigmoid_der()
+            else:
+                self.der: Callable = der
             if esc is None:
                 self.esc = MLP.minmax_scale()
             else:
@@ -553,11 +582,11 @@ class MLP:
 
     @staticmethod
     def sigmoid_der() -> Callable:
-        return lambda a: np.maximum(a * (1 - a), 0.01).T
+        return lambda a: np.maximum(a * (1 - a), 0.01)
 
     @staticmethod
     def minmax_scale():
-        return lambda v, par: (v - par[:, 0])/(par[:, 1, np.newaxis] - par[:, 0, np.newaxis])
+        return lambda v, par: (v - (np.ones(v.shape).T * par[:, 0]).T) / (par[:, 1, np.newaxis] - par[:, 0, np.newaxis])
 
     @staticmethod
     def minmax_descale():
@@ -573,18 +602,17 @@ class MLP:
             print(f'Creating ANN with following architecture: {nodes_per_layer!s}')
 
     @staticmethod
-    def SIN(n_layer, n_previous_layer):
-        """Randomize weights of node"""
+    def randomize_sinaptic_weights(n_layer, n_previous_layer):
         np.random.seed()
         return np.random.randn(n_layer, n_previous_layer + 1)
 
 
 if __name__ == '__main__':
-    """# Pattern and Target
+    # Pattern and Target
     conc = [np.array([[float(0)], [float(0)]]), np.array([np.linspace(0, 10, 111), np.linspace(0, 10, 111)])]
     P = np.concatenate(conc, axis=1)
-    T = np.array(list(map(lambda x: x * 2, P[0])))
-
+    T = np.array(list(map(lambda x: x ** 2, P[0])))
+    T += np.random.rand(len(T))
     M = np.concatenate([P, [T]], axis=0)
 
     # Systematic sampling
@@ -592,34 +620,24 @@ if __name__ == '__main__':
 
     min_values = np.amin(M, axis=1)
     max_values = np.amax(M, axis=1)
-    esc_par = np.array([min_values, max_values-min_values]).T
+    esc_par = np.array([min_values, max_values - min_values]).T
 
     rn = MLP(
-        struct=[1, 5, 1],
-        enom=['x'],
-        snom=['y'],
+        struct=[2, 5, 1],
         epar=esc_par[:-1],
         spar=esc_par[-1],
-        )
+    )
 
     result = P[:, jr] - rn.input.par[:, 0, np.newaxis]
-    a = np.ones(P[:, jr].shape).T
-    b = rn.input.par[:, 0]
-    #print(a.shape, b.shape)
-    result = a * b
-    #print(result.T)
-    [rn, _, J, dtrep] = fntreinaval_jsf3(rn, Pt=P[:, jr], Tt=T[jr].reshape(-1, 1), Pl=P[:, ja], Tl=T[ja].reshape(-1, 1), ciclos=1_000, rep=1, c=0, )
-    # [NS, Mea, Mpea, Pbias, Me, E10, E25, E50, E75, E90, n]=fmudesempenho_jsf(Tl, Sl, 0, 1, snom)"""
-
-    a = np.array([[ 1,  2,  3],
-                   [ 4,  5,  6],
-                   [ 7,  8,  9],
-                   [10, 11, 12]])
-
-    b = np.array([[ 1,  3],
-                   [ 4,  6],
-                   [ 7,  9],
-                   [10, 12]])
-
-    print(a[:-1] - b[:-1, 0])
-    print(a[-1, :] - b[-1, 0])
+    print(rn.hidden.sin.shape)
+    rn, _, J, dtrep = fntreinaval_jsf3(
+        rn,
+        Pt=P[:, jr],
+        Tt=T[jr],
+        Pl=P[:, ja],
+        Tl=T[ja],
+        ciclos=1_000_000,
+        rep=5,
+        c=0,
+    )
+    # [NS, Mea, Mpea, Pbias, Me, E10, E25, E50, E75, E90, n]=fmudesempenho_jsf(Tl, Sl, 0, 1, snom)
